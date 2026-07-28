@@ -1,0 +1,94 @@
+[config]
+default_to_workspace = false
+
+[tasks.format]
+install_crate = "rustfmt"
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+
+[tasks.format-fix]
+install_crate = "rustfmt"
+command = "cargo"
+args = ["fmt", "--all"]
+
+[tasks.clean]
+command = "cargo"
+args = ["clean"]
+
+[tasks.clippy]
+command = "cargo"
+args = ["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+
+[tasks.doc]
+command = "cargo"
+args = ["doc", "--workspace", "--no-deps"]
+env = { RUSTDOCFLAGS = "-D warnings" }
+
+[tasks.copy_to_client]
+command = "cp"
+args = ["-r", "./pkg", "./client/generate-office-files/vendor/"]
+
+[tasks.build]
+command = "cargo"
+args = ["build", "--workspace"]
+dependencies = ["format", "clippy"]
+
+[tasks.test]
+command = "cargo"
+args = ["nextest", "run", "--workspace"]
+dependencies = ["format", "clippy", "doc", "test-doc"]
+
+[tasks.test-doc]
+command = "cargo"
+args = ["test", "--workspace", "--doc"]
+
+[tasks.audit]
+install_crate = "cargo-audit"
+command = "cargo"
+args = ["audit"]
+
+# Documentation linter (Markdown). The config lives at the repository root
+# (`.rumdl.toml`), so this task runs from the repo root via `cwd`. Markdown uses
+# `rumdl` (Rust, auto-installed via `install_crate`); `target/` is excluded via
+# `.rumdl.toml`. Kept out of `ci` so the Rust gate stays free of extra tooling.
+[tasks.lint-md]
+description = "Lint Markdown docs with rumdl"
+install_crate = "rumdl"
+cwd = ".."
+command = "rumdl"
+args = ["check", "."]
+
+[tasks.lint-toml-format]
+install_crate = { crate_name = "taplo-cli", binary = "taplo", test_arg = "--version" }
+cwd = ".."
+command = "taplo"
+args = ["fmt", "--check"]
+
+[tasks.lint-toml-syntax]
+install_crate = { crate_name = "taplo-cli", binary = "taplo", test_arg = "--version" }
+cwd = ".."
+command = "taplo"
+# `--no-schema` keeps the TOML lint network-free: schema validation would fetch
+# remote JSON Schemas (e.g. prek.toml's schemastore URL), which fails in this
+# offline-first / LAN-only deployment. Syntax and built-in lint rules still run.
+args = ["lint", "--no-schema"]
+
+[tasks.format-toml-fix]
+description = "Format TOML in place with taplo (auto-fix counterpart to lint-toml)"
+install_crate = { crate_name = "taplo-cli", binary = "taplo", test_arg = "--version" }
+cwd = ".."
+command = "taplo"
+args = ["fmt"]
+
+[tasks.lint-toml]
+description = "Lint and format-check TOML with taplo"
+dependencies = ["lint-toml-format", "lint-toml-syntax"]
+
+[tasks.lint-docs]
+description = "Lint documentation (Markdown) and configuration (TOML)"
+dependencies = ["lint-md", "lint-toml"]
+
+[tasks.run]
+command = "cargo"
+args = ["run", "-p", "app", "--bin", "parking-monitor-detector"]
+dependencies = ["test"]
